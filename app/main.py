@@ -5,7 +5,14 @@ import streamlit as st
 import time
 from typing import Dict, List, Optional
 import random
+import sys
+import os
+from pathlib import Path
 
+# Add the parent directory to sys.path
+sys.path.append(str(Path(__file__).parent.parent))
+
+# Import from local modules with relative imports
 from app.utils.config import TOPICS
 from app.utils.article_selector import (
     get_random_topic,
