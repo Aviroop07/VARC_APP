@@ -48,9 +48,17 @@ def apply_styles():
     h1, h2, h3 {
         color: #1E88E5;
     }
+    h1 {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+    }
     .stProgress > div > div {
         height: 10px;
         border-radius: 30px;
+    }
+    /* Add some top spacing to the main content */
+    .block-container {
+        padding-top: 2rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -73,6 +81,9 @@ def main():
     
     # Render sidebar
     render_sidebar()
+    
+    # Add vertical spacing before the title
+    st.markdown("<div style='padding-top: 2rem;'></div>", unsafe_allow_html=True)
     
     # App title and introduction
     st.title("📰 Your Daily Curated Article")
