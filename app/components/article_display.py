@@ -100,7 +100,7 @@ def display_article(article: Dict) -> None:
         # Display image if available
         image_url = article.get("image_url")
         if image_url:
-            st.image(image_url, use_column_width=True)
+            st.image(image_url, use_container_width=True)
         
         # Get the article URL
         article_url = article.get("url")
