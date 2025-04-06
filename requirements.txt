@@ -1,0 +1,9 @@
+streamlit
+requests
+beautifulsoup4
+pandas
+python-dotenv
+lxml
+schedule
+numpy
+feedparser 
