@@ -1,221 +1,147 @@
 """
-Main Streamlit application file for the Daily Article Selector.
+Main Streamlit application for displaying daily articles.
 """
 import streamlit as st
-import time
-from typing import Dict, List, Optional
+from datetime import datetime
 import random
-import sys
-import os
-from pathlib import Path
-
-# Add the parent directory to sys.path
-sys.path.append(str(Path(__file__).parent.parent))
-
-# Import from local modules with relative imports
-from app.utils.config import TOPICS
-from app.utils.article_selector import (
-    get_random_topic,
-    get_daily_selection,
-    save_daily_selection,
-    select_article_from_candidates,
-    select_article_by_topic
-)
 from app.scrapers.scraper_factory import ScraperFactory
-from app.components.sidebar import render_sidebar
-from app.components.article_display import (
-    display_article,
-    display_no_article_message,
-    display_loading_message
-)
+from app.components.article_display import display_article, display_text_only_article
+from app.components.topic_selection import display_topic_selection
+from app.components.article_loader import load_articles
+from app.components.article_selector import select_article
+from app.components.article_processor import process_article
+from app.components.article_cache import ArticleCache
+from app.components.article_loader import load_articles
+from app.components.article_selector import select_article
+from app.components.article_processor import process_article
+from app.components.article_cache import ArticleCache
+from app.components.article_display import display_article, display_text_only_article
+from app.components.topic_selection import display_topic_selection
+from app.scrapers.scraper_factory import ScraperFactory
 
-# Page configuration
+# Initialize session state
+if "articles" not in st.session_state:
+    st.session_state.articles = []
+if "selected_article" not in st.session_state:
+    st.session_state.selected_article = None
+if "selected_topic" not in st.session_state:
+    st.session_state.selected_topic = None
+if "last_update" not in st.session_state:
+    st.session_state.last_update = None
+if "article_cache" not in st.session_state:
+    st.session_state.article_cache = ArticleCache()
+
+# Set page config
 st.set_page_config(
-    page_title="Daily Article Selector",
+    page_title="Daily Articles",
     page_icon="📰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Configure CSS
-def apply_styles():
-    """Apply custom styles to the app."""
-    st.markdown("""
+# Add custom CSS
+st.markdown("""
     <style>
-    .main {
+    .stApp {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .article-container {
         padding: 2rem;
     }
-    h1, h2, h3 {
-        color: #1E88E5;
+    .article-header {
+        margin-bottom: 0;
+        padding-bottom: 0;
     }
-    h1 {
-        margin-top: 2rem;
-        padding-top: 1.5rem;
+    .article-text-container {
+        margin-top: 0;
     }
-    .stProgress > div > div {
-        height: 10px;
-        border-radius: 30px;
-    }
-    /* Add some top spacing to the main content */
     .block-container {
-        padding-top: 2rem;
+        padding: 1rem 1rem 0;
+    }
+    .stSpinner > div {
+        margin-top: 0;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# Main application function
-def main():
-    """Main application function."""
-    # Apply custom styles
-    apply_styles()
-    
-    # Initialize session state if not already done
-    if 'cached_articles' not in st.session_state:
-        st.session_state.cached_articles = []
-    if 'current_article' not in st.session_state:
-        st.session_state.current_article = None
-    if 'is_custom_topic' not in st.session_state:
-        st.session_state.is_custom_topic = False
-    if 'reload_article' not in st.session_state:
-        st.session_state.reload_article = False
-    
-    # Render sidebar
-    render_sidebar()
-    
-    # Add vertical spacing before the title
-    st.markdown("<div style='padding-top: 2rem;'></div>", unsafe_allow_html=True)
-    
-    # App title and introduction
-    st.title("📰 Your Daily Curated Article")
-    st.markdown("Each day, we select one interesting article based on topic probabilities.")
-    
-    # Check if we need to reload an article (button was clicked)
-    force_reload = st.session_state.reload_article
-    if force_reload:
-        # Reset the flag
-        st.session_state.reload_article = False
-        # Select a new random article
-        with st.spinner("Finding a new article for you..."):
-            article = select_daily_article()
-            st.session_state.current_article = article
-    else:
-        # Get daily selected article or select a new one
-        article = get_daily_selection()
-                
-        # If no article selected, get a new one
-        if not article:
-            with st.spinner("Selecting today's article..."):
-                article = select_daily_article()
-                
-        st.session_state.current_article = article
-    
-    # If we have an article, add topic name to it
-    if article and "topic" in article and "topic_name" not in article:
-        topic_key = article["topic"]
-        if topic_key in TOPICS:
-            article["topic_name"] = TOPICS[topic_key]["name"]
-    
-    # Display article information
+# Sidebar
+with st.sidebar:
+    st.title("📰 Daily Articles")
     st.markdown("---")
     
-    # Display article or message
-    if article:
-        # Display the selected article
-        display_article(article)
-    else:
-        # Display no article message
-        display_no_article_message()
+    # Topic selection
+    selected_topic = display_topic_selection()
+    st.session_state.selected_topic = selected_topic
+    
+    # Source selection
+    st.markdown("### 📋 News Sources")
+    st.markdown("""
+    Articles are fetched from multiple sources:
+    - The Hindu
+    - The Telegraph
+    - BBC News
+    - Reuters
+    - The Guardian
+    - Times of India
+    """)
+    
+    st.markdown("---")
+    st.markdown("""
+    ### ℹ️ About
+    This app provides daily articles for VARC preparation.
+    Articles are automatically updated daily at 6 AM IST.
+    """)
 
-def fetch_all_articles() -> List[Dict]:
-    """
-    Fetch all articles from cache or by scraping.
-    
-    Returns:
-        List of all available articles
-    """
-    all_articles = []
-    
-    # Get all scrapers
-    scrapers = ScraperFactory.get_all_scrapers()
-    
-    # Step 1: Try to use cached articles first
-    for scraper in scrapers:
-        cached_articles = scraper.load_cached_articles()
-        all_articles.extend(cached_articles)
-    
-    # Step 2: If no cached articles, try primary sources
-    if not all_articles:
-        # Get primary source scrapers
-        primary_scrapers = ScraperFactory.get_primary_scrapers()
-        
-        for scraper in primary_scrapers:
-            try:
-                st.info(f"Fetching articles from {scraper.source_name}...")
-                articles = scraper.scrape_articles()
-                if articles:
-                    st.success(f"Successfully fetched {len(articles)} articles from {scraper.source_name}")
-                    all_articles.extend(articles)
-                else:
-                    st.warning(f"No articles found from {scraper.source_name}")
-            except Exception as e:
-                st.error(f"Error scraping from {scraper.source_name}: {e}")
-    
-    # Step 3: If primary sources failed, try backup sources
-    if not all_articles:
-        # Get backup source scrapers
-        backup_scrapers = ScraperFactory.get_backup_scrapers()
-        
-        for scraper in backup_scrapers:
-            try:
-                st.info(f"Fetching articles from backup source: {scraper.source_name}...")
-                articles = scraper.scrape_articles()
-                if articles:
-                    st.success(f"Successfully fetched {len(articles)} articles from {scraper.source_name}")
-                    all_articles.extend(articles)
-                else:
-                    st.warning(f"No articles found from {scraper.source_name}")
-            except Exception as e:
-                st.error(f"Error scraping from backup source {scraper.source_name}: {e}")
-    
-    return all_articles
+# Main content
+st.title("📰 Daily Articles")
 
-def select_daily_article() -> Optional[Dict]:
-    """
-    Select a new daily article using a robust approach.
-    First tries to use cached articles, then primary sources, 
-    and finally falls back to backup sources if needed.
+# Check if we need to update articles
+current_time = datetime.now()
+if (st.session_state.last_update is None or 
+    (current_time - st.session_state.last_update).days >= 1 or
+    current_time.hour >= 6 and st.session_state.last_update.day < current_time.day):
     
-    Returns:
-        Dict or None: The selected article or None if no article could be selected
-    """
-    # Show loading message
-    display_loading_message()
+    with st.spinner("Fetching latest articles..."):
+        # Get all scrapers
+        scrapers = ScraperFactory.get_all_scrapers()
+        
+        # Load articles from all sources
+        all_articles = []
+        for scraper in scrapers:
+            try:
+                articles = load_articles(scraper)
+                all_articles.extend(articles)
+            except Exception as e:
+                st.error(f"Error loading articles from {scraper.source_name}: {str(e)}")
+                continue
+        
+        if all_articles:
+            st.session_state.articles = all_articles
+            st.session_state.last_update = current_time
+            st.success("Articles updated successfully!")
+        else:
+            st.error("No articles could be loaded. Please try again later.")
+
+# Display articles if available
+if st.session_state.articles:
+    # Select article based on topic
+    selected_article = select_article(st.session_state.articles, st.session_state.selected_topic)
     
-    # Get all articles
-    all_articles = fetch_all_articles()
-    
-    # If still no articles after trying all sources, return None
-    if not all_articles:
-        st.error("Could not fetch articles from any source. Please try again later.")
-        return None
-    
-    # Cache the articles in session state for topic selection
-    st.session_state.cached_articles = all_articles
-    
-    # Get random topic based on probabilities
-    selected_topic = get_random_topic()
-    
-    # Select an article from the candidates for the selected topic
-    selected_article = select_article_from_candidates(all_articles, selected_topic)
-    
-    # Save the selected article for today
     if selected_article:
-        save_daily_selection(selected_article)
-        st.success(f"Selected an article about {TOPICS[selected_topic]['name']}")
+        # Process article content
+        processed_article = process_article(selected_article)
+        
+        # Display article
+        display_article(processed_article)
+        
+        # Add note about custom topic selection
+        if st.session_state.selected_topic:
+            st.info("""
+            ℹ️ You're viewing articles for a custom topic. 
+            To see all available articles, select 'All Topics' in the sidebar.
+            """)
     else:
-        st.error("Could not select an appropriate article. Please try again.")
-    
-    return selected_article
-
-if __name__ == "__main__":
-    main() 
+        st.info("No articles available for the selected topic. Please try a different topic.")
+else:
+    st.info("No articles available at the moment. Please check back later.") 
