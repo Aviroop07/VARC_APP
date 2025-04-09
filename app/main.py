@@ -11,13 +11,6 @@ from app.components.article_loader import load_articles
 from app.components.article_selector import select_article
 from app.components.article_processor import process_article
 from app.components.article_cache import ArticleCache
-from app.components.article_loader import load_articles
-from app.components.article_selector import select_article
-from app.components.article_processor import process_article
-from app.components.article_cache import ArticleCache
-from app.components.article_display import display_article, display_text_only_article
-from app.components.topic_selection import display_topic_selection
-from app.scrapers.scraper_factory import ScraperFactory
 
 # Initialize session state
 if "articles" not in st.session_state:
