@@ -10,7 +10,7 @@ class GuardianScraper(BaseScraper):
     """Scraper for The Guardian articles."""
     
     def __init__(self):
-        super().__init__("guardian")
+        super().__init__("guardian", "https://www.theguardian.com")
         self.urls = {
             "business": "https://www.theguardian.com/business",
             "technology": "https://www.theguardian.com/technology",

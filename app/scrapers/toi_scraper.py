@@ -10,9 +10,7 @@ class TOIScraper(BaseScraper):
     """Scraper for Times of India articles."""
     
     def __init__(self):
-        super().__init__()
-        self.source_name = "Times of India"
-        self.base_url = "https://timesofindia.indiatimes.com"
+        super().__init__("toi", "https://timesofindia.indiatimes.com")
         self.article_url = "https://timesofindia.indiatimes.com/topic/{topic}"
         
     def scrape_articles(self) -> List[Dict]:
