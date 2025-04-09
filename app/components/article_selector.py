@@ -1,17 +1,18 @@
 """
-Component for selecting articles based on topic.
+Component for selecting articles based on topic and source.
 """
-from typing import List, Dict, Optional, DefaultDict
+from typing import List, Dict, Optional
 from collections import defaultdict
 import random
 
-def select_article(articles: List[Dict], topic: Optional[str] = None) -> Optional[Dict]:
+def select_article(articles: List[Dict], topic: Optional[str] = None, source: Optional[str] = None) -> Optional[Dict]:
     """
-    Select an article based on topic with uniform probability across sources.
+    Select an article based on topic and source with uniform probability across sources.
     
     Args:
         articles: List of available articles
         topic: Selected topic or None for all topics
+        source: Selected source or None for all sources
         
     Returns:
         Optional[Dict]: Selected article or None if no match
@@ -19,19 +20,31 @@ def select_article(articles: List[Dict], topic: Optional[str] = None) -> Optiona
     if not articles:
         return None
     
-    # First filter by topic if specified
+    # Filter articles by topic and source
+    filtered_articles = articles
+    
+    # Filter by topic if specified
     if topic:
-        filtered_articles = [a for a in articles if a.get('topic') == topic]
+        filtered_articles = [a for a in filtered_articles if a.get('topic') == topic]
         if not filtered_articles:
             return None
-    else:
-        filtered_articles = articles
     
+    # Filter by source if specified
+    if source:
+        filtered_articles = [a for a in filtered_articles if a.get('source_key', '').lower() == source.lower()]
+        if not filtered_articles:
+            return None
+    
+    # If source is specified, just select a random article from that source
+    if source:
+        return random.choice(filtered_articles)
+    
+    # Otherwise, ensure uniform selection across sources
     # Group articles by source
     articles_by_source = defaultdict(list)
     for article in filtered_articles:
-        source = article.get('source', 'unknown')
-        articles_by_source[source].append(article)
+        source_name = article.get('source', 'unknown')
+        articles_by_source[source_name].append(article)
     
     # Early return if no articles found
     if not articles_by_source:

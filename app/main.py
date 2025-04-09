@@ -7,6 +7,7 @@ import random
 from app.scrapers.scraper_factory import ScraperFactory
 from app.components.article_display import display_article, display_text_only_article
 from app.components.topic_selection import display_topic_selection
+from app.components.source_selection import display_source_selection
 from app.components.article_loader import load_articles
 from app.components.article_selector import select_article
 from app.components.article_processor import process_article
@@ -19,6 +20,8 @@ if "selected_article" not in st.session_state:
     st.session_state.selected_article = None
 if "selected_topic" not in st.session_state:
     st.session_state.selected_topic = None
+if "selected_source" not in st.session_state:
+    st.session_state.selected_source = None
 if "last_update" not in st.session_state:
     st.session_state.last_update = None
 if "article_cache" not in st.session_state:
@@ -64,10 +67,15 @@ with st.sidebar:
     st.markdown("---")
     
     # Topic selection
+    st.markdown("### 🔍 Filter Articles")
     selected_topic = display_topic_selection()
     st.session_state.selected_topic = selected_topic
     
     # Source selection
+    selected_source = display_source_selection()
+    st.session_state.selected_source = selected_source
+    
+    # Source information
     st.markdown("### 📋 News Sources")
     st.markdown("""
     Articles are fetched from multiple sources:
@@ -104,6 +112,9 @@ if (st.session_state.last_update is None or
         for scraper in scrapers:
             try:
                 articles = load_articles(scraper)
+                # Add source_key for filtering
+                for article in articles:
+                    article['source_key'] = scraper.source_name
                 all_articles.extend(articles)
             except Exception as e:
                 st.error(f"Error loading articles from {scraper.source_name}: {str(e)}")
@@ -118,8 +129,12 @@ if (st.session_state.last_update is None or
 
 # Display articles if available
 if st.session_state.articles:
-    # Select article based on topic
-    selected_article = select_article(st.session_state.articles, st.session_state.selected_topic)
+    # Select article based on topic and source
+    selected_article = select_article(
+        st.session_state.articles, 
+        st.session_state.selected_topic,
+        st.session_state.selected_source
+    )
     
     if selected_article:
         # Process article content
@@ -128,13 +143,19 @@ if st.session_state.articles:
         # Display article
         display_article(processed_article)
         
-        # Add note about custom topic selection
+        # Add note about filters
+        filters_applied = []
         if st.session_state.selected_topic:
-            st.info("""
-            ℹ️ You're viewing articles for a custom topic. 
-            To see all available articles, select 'All Topics' in the sidebar.
+            filters_applied.append(f"topic '{st.session_state.selected_topic}'")
+        if st.session_state.selected_source:
+            filters_applied.append(f"source '{st.session_state.selected_source}'")
+            
+        if filters_applied:
+            st.info(f"""
+            ℹ️ You're viewing articles filtered by {' and '.join(filters_applied)}. 
+            To see all available articles, select 'All Topics' and 'All Sources' in the sidebar.
             """)
     else:
-        st.info("No articles available for the selected topic. Please try a different topic.")
+        st.info("No articles available for the selected filters. Please try different topic or source options.")
 else:
     st.info("No articles available at the moment. Please check back later.") 
