@@ -7,7 +7,16 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import datetime
-from newspaper import Article, ArticleException
+
+# Try importing Newspaper3k, but gracefully handle if it's not available
+try:
+    from newspaper import Article, ArticleException
+    NEWSPAPER_AVAILABLE = True
+except ImportError:
+    NEWSPAPER_AVAILABLE = False
+    # Define a placeholder to avoid reference errors
+    class ArticleException(Exception):
+        pass
 
 def display_article(article: Dict) -> None:
     """
@@ -188,33 +197,20 @@ def display_article_content(url: str) -> None:
 
 def display_text_only_article(url: str) -> None:
     """
-    Display a text-only version of the article by extracting main content using Newspaper3k.
+    Display a text-only version of the article by extracting main content.
+    Uses Newspaper3k if available, otherwise falls back to BeautifulSoup.
     
     Args:
         url: URL of the article to extract text from
     """
     try:
         with st.spinner("Extracting article content..."):
-            # Use Newspaper3k for content extraction
-            article = Article(url)
-            
-            # Add user agent to avoid being blocked
-            article.headers = {
+            # Define headers for requests
+            headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml",
                 "Accept-Language": "en-US,en;q=0.9",
             }
-            
-            # Download and parse the article
-            article.download()
-            article.parse()
-            
-            # Try NLP if possible
-            try:
-                article.nlp()
-                has_nlp = True
-            except:
-                has_nlp = False
             
             # Create styled container
             st.markdown("""
@@ -273,29 +269,160 @@ def display_text_only_article(url: str) -> None:
             # Start the container with no gap
             st.markdown('<div class="article-text-container">', unsafe_allow_html=True)
             
-            # Display article content
-            if article.text:
-                # Show keywords if available
-                if has_nlp and article.keywords:
-                    st.markdown('<div class="article-keywords">', unsafe_allow_html=True)
-                    for keyword in article.keywords[:8]:  # Limit to top 8 keywords
-                        st.markdown(f'<span class="article-keyword">{keyword}</span>', unsafe_allow_html=True)
-                    st.markdown('</div>', unsafe_allow_html=True)
+            # Try using Newspaper3k if available
+            if NEWSPAPER_AVAILABLE:
+                try:
+                    # Use Newspaper3k for content extraction
+                    article = Article(url)
+                    article.headers = headers
+                    
+                    # Download and parse the article
+                    article.download()
+                    article.parse()
+                    
+                    # Try NLP if possible
+                    has_nlp = False
+                    try:
+                        article.nlp()
+                        has_nlp = True
+                    except:
+                        pass
+                    
+                    # Display article content
+                    if article.text:
+                        # Show keywords if available
+                        if has_nlp and article.keywords:
+                            st.markdown('<div class="article-keywords">', unsafe_allow_html=True)
+                            for keyword in article.keywords[:8]:  # Limit to top 8 keywords
+                                st.markdown(f'<span class="article-keyword">{keyword}</span>', unsafe_allow_html=True)
+                            st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        # Show article text, split into paragraphs
+                        paragraphs = article.text.split('\n\n')
+                        for paragraph in paragraphs:
+                            if paragraph.strip():
+                                st.markdown(f"<p>{paragraph}</p>", unsafe_allow_html=True)
+                    else:
+                        # Fallback to BeautifulSoup if article text is empty
+                        _display_with_beautifulsoup(url, headers)
                 
-                # Show article text, split into paragraphs
-                paragraphs = article.text.split('\n\n')
-                for paragraph in paragraphs:
-                    if paragraph.strip():
-                        st.markdown(f"<p>{paragraph}</p>", unsafe_allow_html=True)
+                except (ArticleException, ImportError):
+                    # Fallback to BeautifulSoup
+                    _display_with_beautifulsoup(url, headers)
             else:
-                st.warning("No meaningful text content could be extracted from this article.")
+                # If Newspaper3k is not available, use BeautifulSoup
+                _display_with_beautifulsoup(url, headers)
             
             # Close the container
             st.markdown('</div>', unsafe_allow_html=True)
             
-    except ArticleException as e:
+    except Exception as e:
         st.error(f"Error extracting article text: {e}")
         st.info("Try opening the article in a new tab instead.")
+
+def _display_with_beautifulsoup(url: str, headers: Dict) -> None:
+    """
+    Fallback method to display article content using BeautifulSoup.
+    
+    Args:
+        url: URL of the article
+        headers: HTTP headers for the request
+    """
+    try:
+        # Fetch article content
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        # Parse HTML content
+        soup = BeautifulSoup(response.text, 'lxml')
+        
+        # Remove script, style, and nav elements
+        for element in soup(['script', 'style', 'nav', 'header', 'footer', 'aside', 'form']):
+            element.decompose()
+        
+        # Remove all Related Topics sections before processing
+        for element in soup.find_all(string=re.compile("Related Topics", re.IGNORECASE)):
+            parent = element.parent
+            if parent:
+                # Try to find the container or section that contains this heading
+                container = parent
+                for _ in range(5):  # Look up to 5 levels up
+                    if container and (container.name in ['div', 'section', 'article', 'aside']):
+                        container.decompose()
+                        break
+                    container = container.parent if container.parent else None
+                
+                # If no suitable container was found, just remove the parent element
+                if parent and parent.name:
+                    parent.decompose()
+        
+        # Try to find the main content using multiple strategies
+        main_content = None
+        
+        # Strategy 1: Look for semantic elements
+        for selector in ['article', 'main', '.article', '.story', '.content', '.post-content', '[itemprop="articleBody"]']:
+            content = soup.select(selector)
+            if content:
+                main_content = content[0]
+                break
+        
+        # Strategy 2: If still not found, look for largest div with most paragraphs
+        if not main_content:
+            paragraphs_by_parent = {}
+            for p in soup.find_all('p'):
+                parent = p.parent
+                if parent not in paragraphs_by_parent:
+                    paragraphs_by_parent[parent] = []
+                paragraphs_by_parent[parent].append(p)
+            
+            if paragraphs_by_parent:
+                main_content = max(paragraphs_by_parent.items(), key=lambda x: len(x[1]))[0]
+        
+        # If we found content, display it
+        if main_content:
+            # Get all paragraphs and headings
+            paragraphs = main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+            
+            # Process and display paragraphs and headings
+            content_added = False
+            skip_until_next_heading = False
+            
+            for elem in paragraphs:
+                text = elem.get_text().strip()
+                
+                # Skip this element and all following elements until next heading if it contains "Related Topics"
+                if "Related Topics" in text or "related topics" in text.lower():
+                    skip_until_next_heading = True
+                    continue
+                
+                # If we're skipping and encounter a heading, stop skipping
+                if skip_until_next_heading and elem.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                    skip_until_next_heading = False
+                
+                # Skip this element if in skip mode
+                if skip_until_next_heading:
+                    continue
+                
+                # Only render substantial content or headings
+                if len(text) > 40 or elem.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                    tag = elem.name if elem.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] else 'p'
+                    st.markdown(f"<{tag}>{text}</{tag}>", unsafe_allow_html=True)
+                    content_added = True
+            
+            # If no paragraphs found, display all text
+            if not content_added:
+                full_text = main_content.get_text().strip()
+                # Remove any sections starting with "Related Topics" and going to the end of line
+                full_text = re.sub(r'Related Topics.*?(\n|$)', '', full_text, flags=re.IGNORECASE|re.MULTILINE)
+                if full_text:
+                    st.markdown(f"<p>{full_text}</p>", unsafe_allow_html=True)
+                    content_added = True
+            
+            if not content_added:
+                st.warning("No meaningful text content could be extracted from this article.")
+        else:
+            st.warning("Could not identify the main content of the article.")
+    
     except Exception as e:
-        st.error(f"Error processing article: {e}")
+        st.error(f"Error with BeautifulSoup extraction: {e}")
         st.info("Try opening the article in a new tab instead.") 

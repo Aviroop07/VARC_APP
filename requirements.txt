@@ -3,7 +3,7 @@ requests
 beautifulsoup4
 feedparser
 ratelimit
-lxml
+lxml[html_clean]
 python-dateutil
 typing-extensions
 urllib3

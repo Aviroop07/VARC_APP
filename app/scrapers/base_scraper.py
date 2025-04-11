@@ -10,7 +10,13 @@ import time
 from datetime import datetime, timedelta
 import feedparser
 from ratelimit import limits, sleep_and_retry
-from newspaper import Article, ArticleException
+try:
+    from newspaper import Article, ArticleException
+    NEWSPAPER_AVAILABLE = True
+except ImportError:
+    # If newspaper3k or its dependencies are not available
+    NEWSPAPER_AVAILABLE = False
+    ArticleException = Exception  # Define a placeholder
 
 import requests
 from bs4 import BeautifulSoup
@@ -102,7 +108,8 @@ class BaseScraper(ABC):
     @limits(calls=1, period=1/CALLS_PER_SECOND)
     def extract_article_content(self, url: str) -> Dict:
         """
-        Extract article content using Newspaper3k.
+        Extract article content using Newspaper3k if available, or fallback to a simple
+        BeautifulSoup based extraction.
         
         Args:
             url: URL of the article
@@ -113,6 +120,10 @@ class BaseScraper(ABC):
         Raises:
             ScraperException: If the article cannot be parsed
         """
+        # Check if Newspaper3k is available
+        if not NEWSPAPER_AVAILABLE:
+            return self._extract_article_fallback(url)
+            
         try:
             # Configure article
             article = Article(url)
@@ -144,8 +155,111 @@ class BaseScraper(ABC):
                 
             return result
             
-        except ArticleException as e:
+        except (ArticleException, ImportError) as e:
             self.logger.error(f"Error extracting article content from {url}: {e}")
+            # Try the fallback method if Newspaper3k fails
+            return self._extract_article_fallback(url)
+    
+    def _extract_article_fallback(self, url: str) -> Dict:
+        """
+        Fallback method to extract article content using BeautifulSoup when Newspaper3k is not available
+        or fails.
+        
+        Args:
+            url: URL of the article
+            
+        Returns:
+            Dict: Article data extracted with BeautifulSoup
+            
+        Raises:
+            ScraperException: If the article cannot be parsed
+        """
+        try:
+            # Fetch the page
+            response = requests.get(url, headers=self.headers, timeout=10)
+            response.raise_for_status()
+            
+            # Parse HTML
+            soup = BeautifulSoup(response.text, 'lxml')
+            
+            # Extract data
+            title = soup.title.text.strip() if soup.title else ""
+            
+            # Try to find the main content using common patterns
+            main_content = None
+            for selector in ['article', 'main', '.article', '.story', '.content', '.post-content', '[itemprop="articleBody"]']:
+                content = soup.select(selector)
+                if content:
+                    main_content = content[0]
+                    break
+            
+            # Extract text from paragraphs
+            text = ""
+            if main_content:
+                paragraphs = main_content.find_all('p')
+                text = "\n\n".join([p.text.strip() for p in paragraphs if p.text.strip()])
+            else:
+                # Fallback - get all paragraphs
+                paragraphs = soup.find_all('p')
+                text = "\n\n".join([p.text.strip() for p in paragraphs if p.text.strip() and len(p.text.strip()) > 100])
+            
+            # Look for a meta description for a summary
+            summary = ""
+            meta_desc = soup.find('meta', attrs={'name': 'description'})
+            if meta_desc and 'content' in meta_desc.attrs:
+                summary = meta_desc['content'].strip()
+            
+            # Try to find publish date
+            publish_date = None
+            date_meta = soup.find('meta', attrs={'property': 'article:published_time'})
+            if date_meta and 'content' in date_meta.attrs:
+                try:
+                    publish_date = date_meta['content']
+                except:
+                    pass
+            
+            # Extract images
+            images = []
+            main_image_url = ""
+            
+            # Look for og:image first
+            og_image = soup.find('meta', attrs={'property': 'og:image'})
+            if og_image and 'content' in og_image.attrs:
+                main_image_url = og_image['content']
+                images.append(main_image_url)
+            
+            # Collect other images
+            if main_content:
+                for img in main_content.find_all('img'):
+                    if 'src' in img.attrs:
+                        img_url = img['src']
+                        if img_url not in images:
+                            images.append(img_url)
+            
+            # Find author
+            authors = []
+            author_meta = soup.find('meta', attrs={'name': 'author'})
+            if author_meta and 'content' in author_meta.attrs:
+                authors.append(author_meta['content'])
+            
+            # Alternative author methods
+            if not authors:
+                author_elem = soup.select('.author, .byline, [rel="author"]')
+                if author_elem:
+                    authors = [author.text.strip() for author in author_elem if author.text.strip()]
+            
+            return {
+                'title': title,
+                'text': text,
+                'summary': summary,
+                'authors': authors,
+                'publish_date': publish_date,
+                'top_image': main_image_url,
+                'images': images,
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Fallback extraction failed for {url}: {e}")
             raise ScraperException(f"Failed to extract article content from {url}: {e}")
     
     def classify_topic(self, title: str, content: str) -> str:
