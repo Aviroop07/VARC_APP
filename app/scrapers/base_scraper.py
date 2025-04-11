@@ -10,6 +10,7 @@ import time
 from datetime import datetime, timedelta
 import feedparser
 from ratelimit import limits, sleep_and_retry
+from newspaper import Article, ArticleException
 
 import requests
 from bs4 import BeautifulSoup
@@ -96,6 +97,56 @@ class BaseScraper(ABC):
         except Exception as e:
             self.logger.error(f"Error parsing RSS feed {feed_url}: {e}")
             raise ScraperException(f"Failed to parse RSS feed {feed_url}: {e}")
+    
+    @sleep_and_retry
+    @limits(calls=1, period=1/CALLS_PER_SECOND)
+    def extract_article_content(self, url: str) -> Dict:
+        """
+        Extract article content using Newspaper3k.
+        
+        Args:
+            url: URL of the article
+            
+        Returns:
+            Dict: Article data including title, text, publish date, and top image
+            
+        Raises:
+            ScraperException: If the article cannot be parsed
+        """
+        try:
+            # Configure article
+            article = Article(url)
+            article.headers = self.headers
+            
+            # Download and parse
+            article.download()
+            article.parse()
+            
+            # Extract metadata
+            result = {
+                'title': article.title,
+                'text': article.text,
+                'authors': article.authors,
+                'publish_date': article.publish_date,
+                'top_image': article.top_image,
+                'images': list(article.images),
+            }
+            
+            # Try to extract more data if NLP is available
+            try:
+                article.nlp()
+                result.update({
+                    'summary': article.summary,
+                    'keywords': article.keywords,
+                })
+            except Exception as e:
+                self.logger.warning(f"NLP extraction failed for {url}: {e}")
+                
+            return result
+            
+        except ArticleException as e:
+            self.logger.error(f"Error extracting article content from {url}: {e}")
+            raise ScraperException(f"Failed to extract article content from {url}: {e}")
     
     def classify_topic(self, title: str, content: str) -> str:
         """

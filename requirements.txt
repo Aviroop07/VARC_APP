@@ -7,4 +7,5 @@ lxml
 python-dateutil
 typing-extensions
 urllib3
-certifi 
+certifi
+newspaper3k 
