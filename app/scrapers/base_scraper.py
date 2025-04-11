@@ -5,12 +5,10 @@ import json
 import os
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple
-import random
+from typing import Dict, List, Optional
 import time
 from datetime import datetime, timedelta
 import feedparser
-from urllib.parse import urljoin
 from ratelimit import limits, sleep_and_retry
 
 import requests

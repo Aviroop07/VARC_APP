@@ -6,11 +6,15 @@ import datetime
 from typing import Dict
 
 from utils.config import TOPICS, NEWS_SOURCES
-from scrapers.scraper_factory import ScraperFactory
 
 def render_sidebar() -> None:
     """
     Render the sidebar for the application.
+    Note: This function is currently not called directly from main.py,
+    but is kept for future integration or reference.
+    
+    Returns:
+        None
     """
     with st.sidebar:
         st.title("Daily Article Selector")
@@ -46,23 +50,10 @@ def render_sidebar() -> None:
         # News sources section
         st.subheader("News Sources")
         
-        # Get primary and backup sources
-        primary_sources = ScraperFactory._primary_sources
-        backup_sources = ScraperFactory._backup_sources
-        
-        # Display primary sources
-        st.write("Primary Sources:")
-        for source_key in primary_sources:
-            if source_key in NEWS_SOURCES:
-                source_name = NEWS_SOURCES[source_key]["name"]
-                st.markdown(f"- {source_name}")
-        
-        # Display backup sources
-        st.write("Backup Sources:")
-        for source_key in backup_sources:
-            if source_key in NEWS_SOURCES:
-                source_name = NEWS_SOURCES[source_key]["name"]
-                st.markdown(f"- {source_name}")
+        # Display all news sources
+        for source_key, source_data in NEWS_SOURCES.items():
+            source_name = source_data["name"]
+            st.markdown(f"- {source_name}")
             
         st.markdown("---")
         

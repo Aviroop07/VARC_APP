@@ -2,7 +2,7 @@
 Component for displaying the selected daily article.
 """
 import streamlit as st
-from typing import Dict, Optional
+from typing import Dict
 import requests
 from bs4 import BeautifulSoup
 import re
@@ -346,27 +346,4 @@ def display_text_only_article(url: str) -> None:
     
     except Exception as e:
         st.error(f"Error extracting article text: {e}")
-        st.info("Try opening the article in a new tab instead.")
-
-def display_no_article_message() -> None:
-    """
-    Display a message when no article is available.
-    """
-    st.error("No article is currently available. Please try again later.")
-    
-    with st.expander("Why is this happening?"):
-        st.write("""
-        This could be due to one of the following reasons:
-        1. The application is running for the first time and hasn't had a chance to scrape articles yet.
-        2. The scraping process encountered errors.
-        3. The daily selection process hasn't run today.
-        
-        The application will attempt to scrape new articles and select one for today. Please check back soon.
-        """)
-
-def display_loading_message() -> None:
-    """
-    Display a loading message while articles are being scraped.
-    """
-    with st.spinner("Gathering interesting articles for you..."):
-        st.info("This may take a minute or two. We're searching multiple sources to find the perfect article based on your topic preferences.") 
+        st.info("Try opening the article in a new tab instead.") 
