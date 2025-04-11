@@ -94,12 +94,32 @@ class BaseScraper(ABC):
             ScraperException: If the feed cannot be parsed
         """
         try:
-            feed = feedparser.parse(feed_url)
+            # First try to handle redirects using requests
+            response = requests.get(feed_url, headers=self.headers, timeout=10, allow_redirects=True)
+            response.raise_for_status()
             
-            if feed.get('status', 200) != 200:
-                raise ScraperException(f"RSS feed error: Status {feed.get('status')}")
-                
+            # Use the final URL after redirects for feedparser
+            final_url = response.url
+            self.logger.info(f"Using RSS feed URL: {final_url} (originally: {feed_url})")
+            
+            # Parse the feed from the response content directly
+            feed = feedparser.parse(response.content)
+            
+            # Check if feedparser found entries
+            if not feed.entries:
+                # Fallback - try parsing the feed URL directly
+                self.logger.warning(f"No entries found in response content, trying direct URL parsing")
+                feed = feedparser.parse(final_url)
+            
+            # Validate feed has entries
+            if not feed.entries:
+                self.logger.error(f"No entries found in RSS feed: {feed_url}")
+                raise ScraperException(f"No entries found in RSS feed: {feed_url}")
+            
             return feed.entries
+        except requests.RequestException as e:
+            self.logger.error(f"Error fetching RSS feed {feed_url}: {e}")
+            raise ScraperException(f"Failed to fetch RSS feed {feed_url}: {e}")
         except Exception as e:
             self.logger.error(f"Error parsing RSS feed {feed_url}: {e}")
             raise ScraperException(f"Failed to parse RSS feed {feed_url}: {e}")

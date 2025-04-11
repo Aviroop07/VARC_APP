@@ -3,9 +3,8 @@ Main Streamlit application for displaying daily articles.
 """
 import streamlit as st
 from datetime import datetime
-import random
 from scrapers.scraper_factory import ScraperFactory
-from components.article_display import display_article, display_text_only_article
+from components.article_display import display_article
 from components.topic_selection import display_topic_selection
 from components.source_selection import display_source_selection
 from components.article_loader import load_articles
