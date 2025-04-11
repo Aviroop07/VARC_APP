@@ -1,9 +1,10 @@
 streamlit
 requests
 beautifulsoup4
-pandas
-python-dotenv
+feedparser
+ratelimit
 lxml
-schedule
-numpy
-feedparser 
+python-dateutil
+typing-extensions
+urllib3
+certifi 

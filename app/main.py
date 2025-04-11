@@ -4,14 +4,14 @@ Main Streamlit application for displaying daily articles.
 import streamlit as st
 from datetime import datetime
 import random
-from app.scrapers.scraper_factory import ScraperFactory
-from app.components.article_display import display_article, display_text_only_article
-from app.components.topic_selection import display_topic_selection
-from app.components.source_selection import display_source_selection
-from app.components.article_loader import load_articles
-from app.components.article_selector import select_article
-from app.components.article_processor import process_article
-from app.components.article_cache import ArticleCache
+from scrapers.scraper_factory import ScraperFactory
+from components.article_display import display_article, display_text_only_article
+from components.topic_selection import display_topic_selection
+from components.source_selection import display_source_selection
+from components.article_loader import load_articles
+from components.article_selector import select_article
+from components.article_processor import process_article
+from components.article_cache import ArticleCache
 
 # Initialize session state
 if "articles" not in st.session_state:
