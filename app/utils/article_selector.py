@@ -1,5 +1,5 @@
 """
-Module for selecting daily articles based on topic probabilities.
+Utility for selecting articles based on topic.
 """
 import os
 import json
@@ -9,7 +9,7 @@ from typing import Dict, Optional, List
 
 import numpy as np
 
-from app.utils.config import TOPICS, DAILY_SELECTION_FILE
+from utils.config import TOPICS, DAILY_SELECTION_FILE
 
 def get_random_topic() -> str:
     """

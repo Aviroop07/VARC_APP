@@ -2,7 +2,7 @@
 Component for loading articles from scrapers.
 """
 from typing import List, Dict
-from app.scrapers.base_scraper import BaseScraper
+from scrapers.base_scraper import BaseScraper
 
 def load_articles(scraper: BaseScraper) -> List[Dict]:
     """

@@ -5,8 +5,8 @@ import streamlit as st
 import datetime
 from typing import Dict
 
-from app.utils.config import TOPICS, NEWS_SOURCES
-from app.scrapers.scraper_factory import ScraperFactory
+from utils.config import TOPICS, NEWS_SOURCES
+from scrapers.scraper_factory import ScraperFactory
 
 def render_sidebar() -> None:
     """

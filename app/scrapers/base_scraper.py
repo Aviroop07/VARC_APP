@@ -16,7 +16,7 @@ from ratelimit import limits, sleep_and_retry
 import requests
 from bs4 import BeautifulSoup
 
-from app.utils.config import REQUEST_HEADERS, TOPICS, ARTICLES_CACHE_FILE
+from utils.config import REQUEST_HEADERS, TOPICS, ARTICLES_CACHE_FILE
 
 # Configure logging
 logging.basicConfig(

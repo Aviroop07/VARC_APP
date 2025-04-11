@@ -1,13 +1,13 @@
 """
-Scraper for Reuters news.
+Scraper for Reuters.
 """
 from typing import Dict, List, Optional
 import datetime
 import html
 from bs4 import BeautifulSoup
 
-from app.scrapers.base_scraper import BaseScraper
-from app.utils.config import NEWS_SOURCES
+from scrapers.base_scraper import BaseScraper
+from utils.config import NEWS_SOURCES
 
 
 class ReutersScraper(BaseScraper):

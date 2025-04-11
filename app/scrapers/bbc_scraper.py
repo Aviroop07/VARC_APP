@@ -6,8 +6,8 @@ import datetime
 import html
 from bs4 import BeautifulSoup
 
-from app.scrapers.base_scraper import BaseScraper
-from app.utils.config import NEWS_SOURCES
+from scrapers.base_scraper import BaseScraper
+from utils.config import NEWS_SOURCES
 
 
 class BBCScraper(BaseScraper):
